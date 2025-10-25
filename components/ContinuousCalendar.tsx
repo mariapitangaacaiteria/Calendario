@@ -13,13 +13,18 @@ interface ContinuousCalendarProps {
   onClick?: (_day:number, _month:number, _year:number) => void;
   /** porte visual: md (default) | lg | xl */
   size?: 'md' | 'lg' | 'xl';
+  /** tema local: 'light' | 'dark' | 'auto' (herda). default 'auto' */
+  theme?: 'light' | 'dark' | 'auto';
 }
 
-export const ContinuousCalendar: React.FC<ContinuousCalendarProps> = ({ onClick, size = 'lg' }) => {
-  // ----- montagem controlada (evita hydration mismatch) -----
+export const ContinuousCalendar: React.FC<ContinuousCalendarProps> = ({ onClick, size = 'lg', theme = 'auto' }) => {
+  // hooks sempre no topo
   const [mounted, setMounted] = useState(false);
   const [year, setYear] = useState<number>(2000);
   const [selectedMonth, setSelectedMonth] = useState<number>(0);
+
+  const trackRef = useRef<HTMLDivElement | null>(null);
+  const today = new Date();
 
   useEffect(() => {
     const t = new Date();
@@ -28,26 +33,6 @@ export const ContinuousCalendar: React.FC<ContinuousCalendarProps> = ({ onClick,
     setMounted(true);
   }, []);
 
-  // SKELETON: renderiza antes de qualquer cálculo/JSX dinâmico
-  if (!mounted) {
-    return (
-      <div className="rounded-t-3xl bg-white shadow-xl">
-        <div className="p-8">
-          <div className="mb-6 h-8 w-64 rounded bg-slate-200" />
-          <div className="grid grid-cols-7 gap-4">
-            {Array.from({ length: 42 }).map((_, i) => (
-              <div key={i} className="aspect-square rounded-2xl bg-slate-100" />
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  }
-  // -----------------------------------------------------------
-
-  // A partir daqui é apenas client
-  const today = new Date();
-  const trackRef = useRef<HTMLDivElement | null>(null);
   const monthOptions = monthNames.map((name, index) => ({ name, value: index }));
 
   // tamanhos
@@ -145,6 +130,7 @@ export const ContinuousCalendar: React.FC<ContinuousCalendarProps> = ({ onClick,
 
   // painéis dos 12 meses
   const monthsPanels = useMemo(() => {
+    if (!mounted) return null;
     return Array.from({ length: 12 }, (_, m) => {
       const cells = getMonthMatrix(year, m);
       return (
@@ -170,7 +156,10 @@ export const ContinuousCalendar: React.FC<ContinuousCalendarProps> = ({ onClick,
                   className={[
                     'relative aspect-square w-full cursor-pointer border transition-all shadow-sm',
                     sizes.cellRadius,
-                    isCurrentMonth ? 'border-slate-200 bg-white' : 'border-slate-100 bg-slate-50',
+                    // light x dark
+                    isCurrentMonth
+                      ? 'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800/60'
+                      : 'border-slate-100 bg-slate-50 dark:border-slate-800 dark:bg-slate-900/50',
                     'hover:border-cyan-400 hover:shadow focus:outline-none focus:ring-2 focus:ring-cyan-400',
                   ].join(' ')}
                 >
@@ -179,7 +168,7 @@ export const ContinuousCalendar: React.FC<ContinuousCalendarProps> = ({ onClick,
                       'absolute left-2 top-2 flex items-center justify-center rounded-full',
                       sizes.dayBubble,
                       isToday ? 'bg-blue-600 font-semibold text-white' : '',
-                      isCurrentMonth ? 'text-slate-800' : 'text-slate-400',
+                      isCurrentMonth ? 'text-slate-800 dark:text-slate-100' : 'text-slate-400 dark:text-slate-500',
                     ].join(' ')}
                   >
                     {day}
@@ -191,92 +180,121 @@ export const ContinuousCalendar: React.FC<ContinuousCalendarProps> = ({ onClick,
         </div>
       );
     });
-    // importante: não usar "today" nas dependências
-  }, [year, sizes]);
+  }, [mounted, year, sizes]);
 
+  // wrapper opcional para escopo dark local
+  const themeWrapperClass = theme === 'dark' ? 'dark' : '';
+
+  // ----------- RENDER -----------
   return (
-    <div
-      className={[
-        'no-scrollbar calendar-container mx-auto overflow-hidden bg-white pb-12 text-slate-800 shadow-2xl',
-        'rounded-3xl md:rounded-[2rem]',
-        sizes.container,
-      ].join(' ')}
-    >
-      {/* Header */}
-      <div className={`sticky -top-px z-50 w-full rounded-t-3xl bg-white ${sizes.headPadX} ${sizes.headPadT}`}>
-        <div className="mb-6 flex w-full flex-wrap items-center justify-between gap-8 lg:gap-10">
-          <div className="flex flex-wrap items-center gap-6 sm:gap-8">
-            <Select
-              name="month"
-              value={selectedMonth}
-              options={monthOptions}
-              onChange={(newMonth) => setSelectedMonth(newMonth)}
-            />
-            <Select
-              name="year"
-              value={year}
-              options={Array.from({ length: 101 }, (_, i) => {
-                const y = 1950 + i;
-                return { name: `${y}`, value: y };
-              })}
-              onChange={(newYear) => setYear(newYear)}
-              className="w-36 sm:w-40"
-            />
-            <button
-              onClick={handleTodayClick}
-              type="button"
-              className="ml-2 rounded-xl border border-gray-300 bg-white px-6 py-2 text-sm font-medium text-gray-900 hover:bg-gray-100 lg:px-8 lg:py-3 transition-all"
-            >
-              Hoje
-            </button>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <button
-              onClick={goPrevMonth}
-              className={`rounded-full border border-slate-300 ${sizes.navBtnPad} transition-colors hover:bg-slate-100`}
-              aria-label="Mês anterior"
-            >
-              <svg className={`${sizes.navIcon} text-slate-800`} viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="m15 19-7-7 7-7"/>
-              </svg>
-            </button>
-
-            <h1 className={`text-center font-semibold ${sizes.monthTitle}`}>
-              {monthNames[selectedMonth]} {year}
-            </h1>
-
-            <button
-              onClick={goNextMonth}
-              className={`rounded-full border border-slate-300 ${sizes.navBtnPad} transition-colors hover:bg-slate-100`}
-              aria-label="Próximo mês"
-            >
-              <svg className={`${sizes.navIcon} text-slate-800`} viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="m9 5 7 7-7 7"/>
-              </svg>
-            </button>
-          </div>
-        </div>
-
-        {/* cabeçalho dos dias */}
-        <div className="grid w-full grid-cols-7 text-slate-500">
-          {daysOfWeek.map((day, i) => (
-            <div key={i} className="w-full border-b border-slate-200 py-3 text-center text-sm font-semibold sm:text-base">
-              {day}
+    <div className={themeWrapperClass}>
+      <div
+        className={[
+          'no-scrollbar calendar-container mx-auto overflow-hidden pb-12 shadow-2xl',
+          'rounded-3xl md:rounded-[2rem]',
+          'bg-white text-slate-800 dark:bg-slate-900 dark:text-slate-100',
+          sizes.container,
+        ].join(' ')}
+      >
+        {!mounted ? (
+          // SKELETON
+          <div className="rounded-t-3xl bg-white dark:bg-slate-900 shadow-xl">
+            <div className="p-8">
+              <div className="mb-6 h-8 w-64 rounded bg-slate-200 dark:bg-slate-700" />
+              <div className="grid grid-cols-7 gap-4">
+                {Array.from({ length: 42 }).map((_, i) => (
+                  <div key={i} className="aspect-square rounded-2xl bg-slate-100 dark:bg-slate-800" />
+                ))}
+              </div>
             </div>
-          ))}
-        </div>
-      </div>
+          </div>
+        ) : (
+          <>
+            {/* Header */}
+            <div className={`sticky -top-px z-50 w-full rounded-t-3xl bg-white dark:bg-slate-900 ${sizes.headPadX} ${sizes.headPadT}`}>
+              <div className="mb-6 flex w-full flex-wrap items-center justify-between gap-8 lg:gap-10">
+                <div className="flex flex-wrap items-center gap-6 sm:gap-8">
+                  <Select
+                    name="month"
+                    value={selectedMonth}
+                    options={monthOptions}
+                    onChange={(newMonth) => setSelectedMonth(newMonth)}
+                  />
+                  <Select
+                    name="year"
+                    value={year}
+                    options={Array.from({ length: 101 }, (_, i) => {
+                      const y = 1950 + i;
+                      return { name: `${y}`, value: y };
+                    })}
+                    onChange={(newYear) => setYear(newYear)}
+                    className="w-36 sm:w-40"
+                  />
+                  <button
+                    onClick={handleTodayClick}
+                    type="button"
+                    className="ml-2 rounded-xl border border-gray-300 bg-white px-6 py-2 text-sm font-medium text-gray-900 hover:bg-gray-100 lg:px-8 lg:py-3 transition-all
+                               dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-800/80"
+                  >
+                    Hoje
+                  </button>
+                </div>
 
-      {/* trilho 12 meses */}
-      <div className="relative w-full overflow-hidden">
-        <div
-          ref={trackRef}
-          className="flex transition-transform duration-300 ease-out"
-          style={{ transform: `translateX(-${selectedMonth * 100}%)` }}
-        >
-          {monthsPanels}
-        </div>
+                <div className="flex items-center gap-4">
+                  <button
+                    onClick={goPrevMonth}
+                    className={`rounded-full border border-slate-300 ${sizes.navBtnPad} transition-colors hover:bg-slate-100
+                                dark:border-slate-700 dark:hover:bg-slate-800`}
+                    aria-label="Mês anterior"
+                  >
+                    <svg className={`${sizes.navIcon} text-slate-800 dark:text-slate-100`} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                      <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="m15 19-7-7 7-7"/>
+                    </svg>
+                  </button>
+
+                  <h1 className={`text-center font-semibold ${sizes.monthTitle}`}>
+                    {monthNames[selectedMonth]} {year}
+                  </h1>
+
+                  <button
+                    onClick={goNextMonth}
+                    className={`rounded-full border border-slate-300 ${sizes.navBtnPad} transition-colors hover:bg-slate-100
+                                dark:border-slate-700 dark:hover:bg-slate-800`}
+                    aria-label="Próximo mês"
+                  >
+                    <svg className={`${sizes.navIcon} text-slate-800 dark:text-slate-100`} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                      <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="m9 5 7 7-7 7"/>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              {/* cabeçalho dos dias */}
+              <div className="grid w-full grid-cols-7 text-slate-500 dark:text-slate-400">
+                {daysOfWeek.map((day, i) => (
+                  <div
+                    key={i}
+                    className="w-full border-b border-slate-200 py-3 text-center text-sm font-semibold sm:text-base
+                               dark:border-slate-700"
+                  >
+                    {day}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* trilho 12 meses */}
+            <div className="relative w-full overflow-hidden">
+              <div
+                ref={trackRef}
+                className="flex transition-transform duration-300 ease-out"
+                style={{ transform: `translateX(-${selectedMonth * 100}%)` }}
+              >
+                {monthsPanels}
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
@@ -299,7 +317,7 @@ export const Select = ({ name, value, label, options = [], onChange, className }
   return (
     <div className={`relative ${className ?? ''}`}>
       {label && (
-        <label htmlFor={name} className="mb-2 block font-medium text-slate-800">
+        <label htmlFor={name} className="mb-2 block font-medium text-slate-800 dark:text-slate-100">
           {label}
         </label>
       )}
@@ -308,18 +326,20 @@ export const Select = ({ name, value, label, options = [], onChange, className }
         <div className="relative">
           <Listbox.Button
             className="
-              w-44 cursor-pointer rounded-3xl border border-gray-300 bg-white
-              py-2 pl-3 pr-10 text-center text-sm font-medium text-gray-900
+              w-44 cursor-pointer rounded-3xl border bg-white
+              py-2 pl-3 pr-10 text-center text-sm font-medium
               hover:bg-gray-100
               focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-cyan-400
               sm:py-3 sm:pl-3 sm:pr-12
               transition-all
+              border-gray-300 text-gray-900
+              dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-800/80
             "
             aria-label={name}
           >
             <span className="block w-full truncate text-center">{selected?.name}</span>
             <span className="pointer-events-none absolute inset-y-0 right-0 mr-2 flex items-center">
-              <svg className="size-5 text-slate-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <svg className="size-5 text-slate-600 dark:text-slate-300" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                 <path
                   fillRule="evenodd"
                   d="M10 3a.75.75 0 01.55.24l3.25 3.5a.75.75 0 11-1.1 1.02L10 4.852 7.3 7.76a.75.75 0 01-1.1-1.02l3.25-3.5A.75.75 0 0110 3zm-3.76 9.2a.75.75 0 011.06.04l2.7 2.908 2.7-2.908a.75.75 0 111.1 1.02l-3.25 3.5a.75.75 0 01-1.1 0l-3.25-3.5a.75.75 0 01.04-1.06z"
@@ -342,6 +362,7 @@ export const Select = ({ name, value, label, options = [], onChange, className }
               className="
                 absolute z-50 mt-1 max-h-60 w-56 overflow-auto
                 rounded-3xl bg-white py-1 text-sm shadow-lg ring-1 ring-black/5 focus:outline-none
+                dark:bg-slate-800 dark:ring-white/5
               "
             >
               {options.map((opt) => (
@@ -351,7 +372,7 @@ export const Select = ({ name, value, label, options = [], onChange, className }
                   className={({ active, selected }) =>
                     `
                     relative cursor-pointer select-none py-2 px-4 text-center
-                    ${active ? 'bg-cyan-50 text-cyan-900' : 'text-gray-900'}
+                    ${active ? 'bg-cyan-50 text-cyan-900 dark:bg-cyan-900/20 dark:text-cyan-200' : 'text-gray-900 dark:text-slate-100'}
                     ${selected ? 'font-semibold' : 'font-normal'}
                   `
                   }
