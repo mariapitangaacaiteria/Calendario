@@ -9,15 +9,47 @@ const monthNames = [
   'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
 ];
 
+export type PersonInfo = {
+  id: string;
+  name: string;
+  role?: string;
+  task?: string;
+  avatarUrl?: string;
+  email?: string;
+  phone?: string;
+  notes?: string;
+};
+
 interface ContinuousCalendarProps {
   onClick?: (_day:number, _month:number, _year:number) => void;
   /** porte visual: md (default) | lg | xl */
   size?: 'md' | 'lg' | 'xl';
   /** tema local: 'light' | 'dark' | 'auto' (herda). default 'auto' */
   theme?: 'light' | 'dark' | 'auto';
+
+  /** pessoas por data ISO (YYYY-MM-DD) */
+  peopleByDate?: Record<string, PersonInfo[]>;
+
+  /** dispara ao selecionar um dia (já com ISO e pessoas do dia) */
+  onSelectDate?: (iso: string, people: PersonInfo[]) => void;
+
+  /** render extra por dia (opcional) */
+  dayExtras?: (args: {
+    iso: string;
+    isToday: boolean;
+    isCurrentMonth: boolean;
+    people: PersonInfo[];
+  }) => React.ReactNode;
 }
 
-export const ContinuousCalendar: React.FC<ContinuousCalendarProps> = ({ onClick, size = 'lg', theme = 'auto' }) => {
+export const ContinuousCalendar: React.FC<ContinuousCalendarProps> = ({
+  onClick,
+  size = 'lg',
+  theme = 'auto',
+  peopleByDate,
+  onSelectDate,
+  dayExtras,
+}) => {
   // hooks sempre no topo
   const [mounted, setMounted] = useState(false);
   const [year, setYear] = useState<number>(2000);
@@ -33,7 +65,10 @@ export const ContinuousCalendar: React.FC<ContinuousCalendarProps> = ({ onClick,
     setMounted(true);
   }, []);
 
-  const monthOptions = monthNames.map((name, index) => ({ name, value: index }));
+  const monthOptions = useMemo(
+    () => monthNames.map((name, index) => ({ name, value: index })),
+    []
+  );
 
   // tamanhos
   const sizes = {
@@ -128,9 +163,10 @@ export const ContinuousCalendar: React.FC<ContinuousCalendarProps> = ({ onClick,
     return cells;
   };
 
-  // painéis dos 12 meses
-  const monthsPanels = useMemo(() => {
-    if (!mounted) return null;
+  // painéis dos 12 meses (sempre retorna array)
+  const panels = useMemo<JSX.Element[]>(() => {
+    if (!mounted) return [];
+
     return Array.from({ length: 12 }, (_, m) => {
       const cells = getMonthMatrix(year, m);
       return (
@@ -138,31 +174,46 @@ export const ContinuousCalendar: React.FC<ContinuousCalendarProps> = ({ onClick,
           key={`month-panel-${year}-${m}`}
           className={`min-w-full shrink-0 ${sizes.panelPadX} ${sizes.panelPadT}`}
           aria-label={`${monthNames[m]} de ${year}`}
+          role="grid"
+          aria-readonly="true"
         >
           <div className={`grid grid-cols-7 ${sizes.gridGap}`}>
             {cells.map(({ day, month }, idx) => {
               const displayYear = month < 0 ? year - 1 : month > 11 ? year + 1 : year;
+              const displayMonth = month < 0 ? 11 : month > 11 ? 0 : month;
+
               const isToday =
                 today.getDate() === day &&
-                today.getMonth() === (month < 0 ? 11 : month > 11 ? 0 : month) &&
+                today.getMonth() === displayMonth &&
                 today.getFullYear() === displayYear;
 
               const isCurrentMonth = month === m;
 
+              const iso = `${displayYear}-${String(displayMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+              const people = (peopleByDate?.[iso] ?? []);
+
+              const handleClickCell = () => {
+                if (onSelectDate) onSelectDate(iso, people);
+                handleDayClick(day, month, year);
+              };
+
               return (
                 <div
-                  key={`cell-${year}-${m}-${idx}`}
-                  onClick={() => handleDayClick(day, month, year)}
+                  key={`cell-${iso}`}
+                  onClick={handleClickCell}
                   className={[
                     'relative aspect-square w-full cursor-pointer border transition-all shadow-sm',
                     sizes.cellRadius,
-                    // light x dark
                     isCurrentMonth
                       ? 'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800/60'
                       : 'border-slate-100 bg-slate-50 dark:border-slate-800 dark:bg-slate-900/50',
                     'hover:border-cyan-400 hover:shadow focus:outline-none focus:ring-2 focus:ring-cyan-400',
                   ].join(' ')}
+                  role="gridcell"
+                  aria-label={`${day} de ${monthNames[displayMonth]} de ${displayYear}`}
+                  {...(isToday ? { 'aria-current': 'date' } : {})}
                 >
+                  {/* número do dia */}
                   <span
                     className={[
                       'absolute left-2 top-2 flex items-center justify-center rounded-full',
@@ -173,6 +224,23 @@ export const ContinuousCalendar: React.FC<ContinuousCalendarProps> = ({ onClick,
                   >
                     {day}
                   </span>
+
+                  {/* badge de contagem */}
+                  {people.length > 0 && (
+                    <span
+                      className="
+                        absolute bottom-2 right-2 min-w-6 h-6 px-2 rounded-full
+                        flex items-center justify-center text-xs font-semibold
+                        bg-cyan-600 text-white shadow-sm
+                      "
+                      aria-label={`${people.length} pessoa${people.length > 1 ? 's' : ''} marcada${people.length > 1 ? 's' : ''}`}
+                    >
+                      {people.length}
+                    </span>
+                  )}
+
+                  {/* extra custom opcional */}
+                  {dayExtras?.({ iso, isToday, isCurrentMonth, people })}
                 </div>
               );
             })}
@@ -180,7 +248,7 @@ export const ContinuousCalendar: React.FC<ContinuousCalendarProps> = ({ onClick,
         </div>
       );
     });
-  }, [mounted, year, sizes]);
+  }, [mounted, year, sizes, peopleByDate, onSelectDate]);
 
   // wrapper opcional para escopo dark local
   const themeWrapperClass = theme === 'dark' ? 'dark' : '';
@@ -190,15 +258,16 @@ export const ContinuousCalendar: React.FC<ContinuousCalendarProps> = ({ onClick,
     <div className={themeWrapperClass}>
       <div
         className={[
-          'no-scrollbar calendar-container mx-auto overflow-hidden pb-12 shadow-2xl',
-          'rounded-3xl md:rounded-[2rem]',
+          'no-scrollbar calendar-container mx-auto overflow-hidden pb-8 sm:pb-12 shadow-2xl',
+          'rounded-2xl sm:rounded-3xl md:rounded-[2rem]',
           'bg-white text-slate-800 dark:bg-slate-900 dark:text-slate-100',
+          'px-3 sm:px-4',
           sizes.container,
         ].join(' ')}
       >
         {!mounted ? (
           // SKELETON
-          <div className="rounded-t-3xl bg-white dark:bg-slate-900 shadow-xl">
+          <div className="rounded-t-3xl bg-white dark:bg-slate-900 shadow-xl" aria-busy="true" aria-live="polite">
             <div className="p-8">
               <div className="mb-6 h-8 w-64 rounded bg-slate-200 dark:bg-slate-700" />
               <div className="grid grid-cols-7 gap-4">
@@ -210,15 +279,17 @@ export const ContinuousCalendar: React.FC<ContinuousCalendarProps> = ({ onClick,
           </div>
         ) : (
           <>
-            {/* Header */}
-            <div className={`sticky -top-px z-50 w-full rounded-t-3xl bg-white dark:bg-slate-900 ${sizes.headPadX} ${sizes.headPadT}`}>
-              <div className="mb-6 flex w-full flex-wrap items-center justify-between gap-8 lg:gap-10">
-                <div className="flex flex-wrap items-center gap-6 sm:gap-8">
+            {/* Header (já inclui o cabeçalho dos dias) */}
+            <div className={`sticky -top-px z-50 w-full rounded-t-3xl bg-white/90 dark:bg-slate-900/90 backdrop-blur ${sizes.headPadX} ${sizes.headPadT} border-b border-slate-200/70 dark:border-slate-800/70`}>
+              <div className="mb-4 sm:mb-6 flex w-full flex-wrap items-center justify-between gap-3 sm:gap-6">
+                {/* lado esquerdo: selects + hoje */}
+                <div className="flex flex-wrap items-center gap-3 sm:gap-4">
                   <Select
                     name="month"
                     value={selectedMonth}
                     options={monthOptions}
                     onChange={(newMonth) => setSelectedMonth(newMonth)}
+                    className="w-36 sm:w-40"
                   />
                   <Select
                     name="year"
@@ -228,23 +299,23 @@ export const ContinuousCalendar: React.FC<ContinuousCalendarProps> = ({ onClick,
                       return { name: `${y}`, value: y };
                     })}
                     onChange={(newYear) => setYear(newYear)}
-                    className="w-36 sm:w-40"
+                    className="w-28 sm:w-36"
                   />
                   <button
                     onClick={handleTodayClick}
                     type="button"
-                    className="ml-2 rounded-xl border border-gray-300 bg-white px-6 py-2 text-sm font-medium text-gray-900 hover:bg-gray-100 lg:px-8 lg:py-3 transition-all
+                    className="rounded-xl border border-gray-300 bg-white px-4 py-2 text-xs sm:text-sm font-medium text-gray-900 hover:bg-gray-100 transition-all
                                dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-800/80"
                   >
                     Hoje
                   </button>
                 </div>
 
-                <div className="flex items-center gap-4">
+                {/* lado direito: nav + título */}
+                <div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0 justify-end">
                   <button
                     onClick={goPrevMonth}
-                    className={`rounded-full border border-slate-300 ${sizes.navBtnPad} transition-colors hover:bg-slate-100
-                                dark:border-slate-700 dark:hover:bg-slate-800`}
+                    className={`rounded-full border border-slate-300 ${sizes.navBtnPad} transition-colors hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800 shrink-0`}
                     aria-label="Mês anterior"
                   >
                     <svg className={`${sizes.navIcon} text-slate-800 dark:text-slate-100`} viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -252,14 +323,13 @@ export const ContinuousCalendar: React.FC<ContinuousCalendarProps> = ({ onClick,
                     </svg>
                   </button>
 
-                  <h1 className={`text-center font-semibold ${sizes.monthTitle}`}>
+                  <h1 className="mx-1 sm:mx-2 truncate text-center font-semibold text-lg sm:text-2xl md:text-3xl">
                     {monthNames[selectedMonth]} {year}
                   </h1>
 
                   <button
                     onClick={goNextMonth}
-                    className={`rounded-full border border-slate-300 ${sizes.navBtnPad} transition-colors hover:bg-slate-100
-                                dark:border-slate-700 dark:hover:bg-slate-800`}
+                    className={`rounded-full border border-slate-300 ${sizes.navBtnPad} transition-colors hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800 shrink-0`}
                     aria-label="Próximo mês"
                   >
                     <svg className={`${sizes.navIcon} text-slate-800 dark:text-slate-100`} viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -270,12 +340,12 @@ export const ContinuousCalendar: React.FC<ContinuousCalendarProps> = ({ onClick,
               </div>
 
               {/* cabeçalho dos dias */}
-              <div className="grid w-full grid-cols-7 text-slate-500 dark:text-slate-400">
+              <div className="grid w-full grid-cols-7 text-slate-500 dark:text-slate-400" role="row">
                 {daysOfWeek.map((day, i) => (
                   <div
                     key={i}
-                    className="w-full border-b border-slate-200 py-3 text-center text-sm font-semibold sm:text-base
-                               dark:border-slate-700"
+                    role="columnheader"
+                    className="w-full border-b border-slate-200 py-2 sm:py-3 text-center text-[11px] sm:text-sm font-semibold dark:border-slate-700"
                   >
                     {day}
                   </div>
@@ -290,7 +360,7 @@ export const ContinuousCalendar: React.FC<ContinuousCalendarProps> = ({ onClick,
                 className="flex transition-transform duration-300 ease-out"
                 style={{ transform: `translateX(-${selectedMonth * 100}%)` }}
               >
-                {monthsPanels}
+                {panels}
               </div>
             </div>
           </>
@@ -326,7 +396,7 @@ export const Select = ({ name, value, label, options = [], onChange, className }
         <div className="relative">
           <Listbox.Button
             className="
-              w-44 cursor-pointer rounded-3xl border bg-white
+              w-36 sm:w-44 cursor-pointer rounded-3xl border bg-white
               py-2 pl-3 pr-10 text-center text-sm font-medium
               hover:bg-gray-100
               focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-cyan-400
