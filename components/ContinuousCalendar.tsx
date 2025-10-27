@@ -304,7 +304,7 @@ export const ContinuousCalendar: React.FC<ContinuousCalendarProps> = ({
                   <button
                     onClick={handleTodayClick}
                     type="button"
-                    className="rounded-xl border border-gray-300 bg-white px-4 py-2 text-xs sm:text-sm font-medium text-gray-900 hover:bg-gray-100 transition-all
+                    className="rounded-xl border border-gray-300 bg-white m-8  px-4 py-2 text-xs sm:text-sm font-medium text-gray-900 hover:bg-gray-100 transition-all
                                dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-800/80"
                   >
                     Hoje
