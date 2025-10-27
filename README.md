@@ -54,4 +54,7 @@ git clone <seu-repo-url>
 cd <pasta-do-projeto>
 pnpm install   # ou npm install / yarn
 
+```
 
+<img src="https://i.imgur.com/fS82jhl.png" alt="calendario ligth"><br>
+<img src="https://imgur.com/CkfuvsO.png" alt="calendario dark">
