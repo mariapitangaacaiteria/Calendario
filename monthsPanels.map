@@ -1,0 +1,68 @@
+{cells.map(({ day, month }, idx) => {
+  const displayMonth = month < 0 ? 11 : month > 11 ? 0 : month;
+  const displayYear = month < 0 ? year - 1 : month > 11 ? year + 1 : year;
+
+  const isToday =
+    today.getDate() === day &&
+    today.getMonth() === displayMonth &&
+    today.getFullYear() === displayYear;
+
+  const isCurrentMonth = month === m;
+
+  const iso = `${displayYear}-${String(displayMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  const people = (peopleByDate?.[iso] ?? []);
+
+  const handleClickCell = () => {
+    // novo callback (com iso e pessoas)
+    if (onSelectDate) onSelectDate(iso, people);
+    // mantém comportamento antigo
+    handleDayClick(day, month, year);
+  };
+
+  return (
+    <div
+      key={`cell-${iso}`}
+      onClick={handleClickCell}
+      className={[
+        'relative aspect-square w-full cursor-pointer border transition-all shadow-sm',
+        sizes.cellRadius,
+        isCurrentMonth
+          ? 'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800/60'
+          : 'border-slate-100 bg-slate-50 dark:border-slate-800 dark:bg-slate-900/50',
+        'hover:border-cyan-400 hover:shadow focus:outline-none focus:ring-2 focus:ring-cyan-400',
+      ].join(' ')}
+      role="gridcell"
+      aria-label={`${day} de ${monthNames[displayMonth]} de ${displayYear}`}
+      {...(isToday ? { 'aria-current': 'date' } : {})}
+    >
+      {/* número do dia */}
+      <span
+        className={[
+          'absolute left-2 top-2 flex items-center justify-center rounded-full',
+          sizes.dayBubble,
+          isToday ? 'bg-blue-600 font-semibold text-white' : '',
+          isCurrentMonth ? 'text-slate-800 dark:text-slate-100' : 'text-slate-400 dark:text-slate-500',
+        ].join(' ')}
+      >
+        {day}
+      </span>
+
+      {/* badge de contagem se houver pessoas */}
+      {people.length > 0 && (
+        <span
+          className="
+            absolute bottom-2 right-2 min-w-6 h-6 px-2 rounded-full
+            flex items-center justify-center text-xs font-semibold
+            bg-cyan-600 text-white shadow-sm
+          "
+          aria-label={`${people.length} pessoa${people.length > 1 ? 's' : ''} marcada${people.length > 1 ? 's' : ''}`}
+        >
+          {people.length}
+        </span>
+      )}
+
+      {/* extra custom opcional */}
+      {dayExtras?.({ iso, isToday, isCurrentMonth, people })}
+    </div>
+  );
+})}
