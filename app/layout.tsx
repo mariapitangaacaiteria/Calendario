@@ -16,11 +16,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="bg-gray-200">
-      <body className={inter.className}>
+    <html lang="pt-BR" className="bg-gray-200 dark:bg-slate-900 transition-colors duration-300">
+      <body className={`${inter.className} bg-gray-200 dark:bg-slate-900 transition-colors duration-300`}>
         <SnackProvider>
           {children}
-        </ SnackProvider>
+        </SnackProvider>
       </body>
     </html>
   );

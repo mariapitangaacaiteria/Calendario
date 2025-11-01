@@ -3,7 +3,6 @@
 import React, {
   createContext, useState, useContext, ReactNode, useCallback, useRef, useEffect,
 } from 'react';
-import { ErrorIcon, SuccessIcon } from '@/components/icons/SnackIcons';
 import { createPortal } from 'react-dom';
 
 type Variant = 'success' | 'error';
@@ -33,7 +32,12 @@ interface Snack {
 
 export const SnackProvider: React.FC<SnackProviderProps> = ({ children }) => {
   const [snacks, setSnacks] = useState<Snack[]>([]);
+  const [mounted, setMounted] = useState(false);
   const timeoutsRef = useRef<number[]>([]);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const clearAllTimers = () => {
     timeoutsRef.current.forEach((t) => clearTimeout(t));
@@ -89,7 +93,7 @@ export const SnackProvider: React.FC<SnackProviderProps> = ({ children }) => {
     <SnackContext.Provider value={{ createSnack }}>
       {children}
       {/* portal para evitar clipping */}
-      {typeof window !== 'undefined' ? createPortal(snackMarkup, document.body) : null}
+      {mounted ? createPortal(snackMarkup, document.body) : null}
     </SnackContext.Provider>
   );
 };

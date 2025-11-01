@@ -17,11 +17,12 @@ interface ContinuousCalendarProps {
   theme?: 'light' | 'dark' | 'auto';
 }
 
-export const ContinuousCalendar: React.FC<ContinuousCalendarProps> = ({ onClick, size = 'lg', theme = 'auto' }) => {
+export const ContinuousCalendar: React.FC<ContinuousCalendarProps> = ({ onClick, size = 'lg', theme: initialTheme = 'auto' }) => {
   // hooks sempre no topo
   const [mounted, setMounted] = useState(false);
   const [year, setYear] = useState<number>(2000);
   const [selectedMonth, setSelectedMonth] = useState<number>(0);
+  const [darkMode, setDarkMode] = useState<boolean>(false);
 
   const trackRef = useRef<HTMLDivElement | null>(null);
   const today = new Date();
@@ -30,8 +31,33 @@ export const ContinuousCalendar: React.FC<ContinuousCalendarProps> = ({ onClick,
     const t = new Date();
     setYear(t.getFullYear());
     setSelectedMonth(t.getMonth());
+    
+    // Carrega preferência do tema do localStorage ou usa o tema inicial
+    if (initialTheme === 'auto') {
+      if (typeof window !== 'undefined') {
+        const savedTheme = localStorage.getItem('calendar-theme');
+        if (savedTheme) {
+          setDarkMode(savedTheme === 'dark');
+        } else {
+          // Detecta preferência do sistema
+          const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          setDarkMode(prefersDark);
+        }
+      }
+    } else {
+      setDarkMode(initialTheme === 'dark');
+    }
+    
     setMounted(true);
-  }, []);
+  }, [initialTheme]);
+
+  const toggleTheme = () => {
+    const newDarkMode = !darkMode;
+    setDarkMode(newDarkMode);
+    if (initialTheme === 'auto' && typeof window !== 'undefined') {
+      localStorage.setItem('calendar-theme', newDarkMode ? 'dark' : 'light');
+    }
+  };
 
   const monthOptions = monthNames.map((name, index) => ({ name, value: index }));
 
@@ -160,15 +186,17 @@ export const ContinuousCalendar: React.FC<ContinuousCalendarProps> = ({ onClick,
                     isCurrentMonth
                       ? 'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800/60'
                       : 'border-slate-100 bg-slate-50 dark:border-slate-800 dark:bg-slate-900/50',
-                    'hover:border-cyan-400 hover:shadow focus:outline-none focus:ring-2 focus:ring-cyan-400',
+                    'hover:border-cyan-400 hover:shadow-md hover:scale-105 focus:outline-none focus:ring-2 focus:ring-cyan-400',
+                    'transition-all duration-200',
                   ].join(' ')}
                 >
                   <span
                     className={[
-                      'absolute left-2 top-2 flex items-center justify-center rounded-full',
+                      'absolute left-2 top-2 flex items-center justify-center rounded-full transition-all duration-200',
                       sizes.dayBubble,
-                      isToday ? 'bg-blue-600 font-semibold text-white' : '',
-                      isCurrentMonth ? 'text-slate-800 dark:text-slate-100' : 'text-slate-400 dark:text-slate-500',
+                      isToday ? 'bg-gradient-to-br from-blue-500 to-blue-600 font-semibold text-white shadow-lg shadow-blue-500/50 scale-110' : '',
+                      isCurrentMonth ? 'text-slate-800 dark:text-slate-100 font-medium' : 'text-slate-400 dark:text-slate-500',
+                      !isToday && isCurrentMonth ? 'hover:bg-slate-100 dark:hover:bg-slate-700' : '',
                     ].join(' ')}
                   >
                     {day}
@@ -183,7 +211,7 @@ export const ContinuousCalendar: React.FC<ContinuousCalendarProps> = ({ onClick,
   }, [mounted, year, sizes]);
 
   // wrapper opcional para escopo dark local
-  const themeWrapperClass = theme === 'dark' ? 'dark' : '';
+  const themeWrapperClass = darkMode ? 'dark' : '';
 
   // ----------- RENDER -----------
   return (
@@ -193,6 +221,7 @@ export const ContinuousCalendar: React.FC<ContinuousCalendarProps> = ({ onClick,
           'no-scrollbar calendar-container mx-auto overflow-hidden pb-12 shadow-2xl',
           'rounded-3xl md:rounded-[2rem]',
           'bg-white text-slate-800 dark:bg-slate-900 dark:text-slate-100',
+          'transition-colors duration-300',
           sizes.container,
         ].join(' ')}
       >
@@ -211,7 +240,7 @@ export const ContinuousCalendar: React.FC<ContinuousCalendarProps> = ({ onClick,
         ) : (
           <>
             {/* Header */}
-            <div className={`sticky -top-px z-50 w-full rounded-t-3xl bg-white dark:bg-slate-900 ${sizes.headPadX} ${sizes.headPadT}`}>
+            <div className={`sticky -top-px z-50 w-full rounded-t-3xl bg-white dark:bg-slate-900 transition-colors duration-300 ${sizes.headPadX} ${sizes.headPadT} shadow-sm`}>
               <div className="mb-6 flex w-full flex-wrap items-center justify-between gap-8 lg:gap-10">
                 <div className="flex flex-wrap items-center gap-6 sm:gap-8">
                   <Select
@@ -233,17 +262,35 @@ export const ContinuousCalendar: React.FC<ContinuousCalendarProps> = ({ onClick,
                   <button
                     onClick={handleTodayClick}
                     type="button"
-                    className="ml-2 rounded-xl border border-gray-300 bg-white px-6 py-2 text-sm font-medium text-gray-900 hover:bg-gray-100 lg:px-8 lg:py-3 transition-all
-                               dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-800/80"
+                    className="ml-2 rounded-xl border border-gray-300 bg-white px-6 py-2 text-sm font-medium text-gray-900 hover:bg-gray-100 lg:px-8 lg:py-3 transition-all dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-800/80"
                   >
                     Hoje
                   </button>
                 </div>
 
                 <div className="flex items-center gap-4">
+                  {/* Botão de Toggle de Tema */}
+                  <button
+                    onClick={toggleTheme}
+                    type="button"
+                    className="relative rounded-full border border-gray-300 bg-white p-2.5 transition-all hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 dark:border-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700"
+                    aria-label={darkMode ? 'Ativar modo claro' : 'Ativar modo escuro'}
+                  >
+                    {darkMode ? (
+                      // Ícone de sol (modo claro)
+                      <svg className="size-5 text-yellow-500 transition-transform hover:rotate-180" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                        <path fillRule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clipRule="evenodd" />
+                      </svg>
+                    ) : (
+                      // Ícone de lua (modo escuro)
+                      <svg className="size-5 text-slate-700 transition-transform hover:rotate-12 dark:text-slate-300" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" />
+                      </svg>
+                    )}
+                  </button>
                   <button
                     onClick={goPrevMonth}
-                    className={`rounded-full border border-slate-300 ${sizes.navBtnPad} transition-colors hover:bg-slate-100
+                    className={`rounded-full border border-slate-300 ${sizes.navBtnPad} transition-all duration-200 hover:bg-slate-100 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-cyan-400
                                 dark:border-slate-700 dark:hover:bg-slate-800`}
                     aria-label="Mês anterior"
                   >
@@ -258,7 +305,7 @@ export const ContinuousCalendar: React.FC<ContinuousCalendarProps> = ({ onClick,
 
                   <button
                     onClick={goNextMonth}
-                    className={`rounded-full border border-slate-300 ${sizes.navBtnPad} transition-colors hover:bg-slate-100
+                    className={`rounded-full border border-slate-300 ${sizes.navBtnPad} transition-all duration-200 hover:bg-slate-100 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-cyan-400
                                 dark:border-slate-700 dark:hover:bg-slate-800`}
                     aria-label="Próximo mês"
                   >
